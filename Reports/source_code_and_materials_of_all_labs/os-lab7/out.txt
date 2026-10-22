@@ -1,0 +1,8 @@
+total 68
+-rw-r--r-- 1 user user     0 Oct 19 14:30 out.txt
+-rwxrwxr-x 1 user user 16344 Oct 19 14:30 redirect
+-rw-rw-r-- 1 user user   725 Oct 19 14:30 redirect.c
+-rwxrwxr-x 1 user user 16400 Oct 19 14:15 run
+-rw-rw-r-- 1 user user   949 Oct 19 14:14 run.c
+-rwxrwxr-x 1 user user 16440 Oct 19 14:21 zombie
+-rw-rw-r-- 1 user user   951 Oct 19 14:21 zombie.c
