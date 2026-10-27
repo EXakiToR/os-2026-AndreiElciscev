@@ -131,6 +131,7 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 
 UPROGS=\
 	$U/_cat\
+	$U/_find\
 	$U/_zombie\
 	$U/_run\
 	$U/_pingpong\
