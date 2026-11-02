@@ -1,0 +1,2 @@
+$ git switch -c codex/lab10-trace
+Switched to a new branch 'codex/lab10-trace'

@@ -1,0 +1,15 @@
+$ bash -c git log -2 --oneline; git status --short; git show --stat --oneline HEAD
+4f95820 Add per-process trace system call and mask inheritance
+3952f44 Preserve existing coursework before Lab 10
+?? args
+4f95820 Add per-process trace system call and mask inheritance
+ Makefile         |  1 +
+ kernel/proc.c    |  2 ++
+ kernel/proc.h    |  1 +
+ kernel/syscall.c | 31 +++++++++++++++++++++++++++++++
+ kernel/syscall.h |  1 +
+ kernel/sysproc.c |  9 +++++++++
+ user/trace.c     | 19 +++++++++++++++++++
+ user/user.h      |  1 +
+ user/usys.pl     |  1 +
+ 9 files changed, 66 insertions(+)

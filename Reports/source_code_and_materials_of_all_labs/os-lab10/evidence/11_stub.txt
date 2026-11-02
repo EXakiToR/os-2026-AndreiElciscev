@@ -1,0 +1,14 @@
+$ bash -c sed -n '/^trace:/,+3p' user/usys.S; git diff --check; git diff --stat
+trace:
+ li a7, SYS_trace
+ ecall
+ ret
+ Makefile         |  1 +
+ kernel/proc.c    |  2 ++
+ kernel/proc.h    |  1 +
+ kernel/syscall.c | 31 +++++++++++++++++++++++++++++++
+ kernel/syscall.h |  1 +
+ kernel/sysproc.c |  9 +++++++++
+ user/user.h      |  1 +
+ user/usys.pl     |  1 +
+ 8 files changed, 47 insertions(+)

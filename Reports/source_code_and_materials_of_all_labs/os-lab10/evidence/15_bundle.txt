@@ -1,0 +1,1 @@
+$ git bundle create /home/user/os-lab10/xv6-lab10.bundle codex/lab10-trace

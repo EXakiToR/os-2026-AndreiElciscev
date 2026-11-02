@@ -1,0 +1,78 @@
+$ make qemu
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 3 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 2 starting
+hart 1 starting
+init: starting sh
+$ trace 2 usertests forkforkfork
+usertests starting
+test forkforkfork: 3: syscall fork -> 4
+4: syscall fork -> 5
+5: syscall fork -> 6
+5: syscall fork -> 7
+6: syscall fork -> 8
+6: syscall fork -> 9
+7: syscall fork -> 10
+5: syscall fork -> 11
+6: syscall fork -> 12
+6: syscall fork -> 13
+5: syscall fork -> 14
+5: syscall fork -> 15
+6: syscall fork -> 16
+6: syscall fork -> 17
+6: syscall fork -> 18
+5: syscall fork -> 19
+6: syscall fork -> 20
+5: syscall fork -> 21
+6: syscall fork -> 22
+6: syscall fork -> 23
+6: syscall fork -> 24
+5: syscall fork -> 25
+6: syscall fork -> 26
+5: syscall fork -> 27
+5: syscall fork -> 28
+6: syscall fork -> 29
+6: syscall fork -> 30
+5: syscall fork -> 31
+6: syscall fork -> 32
+5: syscall fork -> 33
+5: syscall fork -> 34
+5: syscall fork -> 35
+5: syscall fork -> 36
+6: syscall fork -> 37
+5: syscall fork -> 38
+6: syscall fork -> 39
+6: syscall fork -> 40
+6: syscall fork -> 41
+5: syscall fork -> 42
+6: syscall fork -> 43
+6: syscall fork -> 44
+6: syscall fork -> 45
+5: syscall fork -> 46
+6: syscall fork -> 47
+6: syscall fork -> 48
+6: syscall fork -> 49
+47: syscall fork -> 50
+5: syscall fork -> 51
+5: syscall fork -> 52
+6: syscall fork -> 53
+5: syscall fork -> 54
+48: syscall fork -> 55
+5: syscall fork -> 56
+6: syscall fork -> 57
+5: syscall fork -> 58
+6: syscall fork -> 59
+5: syscall fork -> 60
+6: syscall fork -> 61
+21: syscall fork -> 62
+5: syscall fork -> 63
+6: syscall fork -> 64
+5: syscall fork -> -1
+6: syscall fork -> -1
+OK
+ALL TESTS PASSED
+$ echo after-fork-test
+after-fork-test
+$ QEMU: Terminated

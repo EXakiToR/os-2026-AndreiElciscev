@@ -1,0 +1,31 @@
+$ make qemu
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 3 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 1 starting
+hart 2 starting
+init: starting sh
+$ trace 2147483647 grep hello README
+3: syscall trace -> 0
+3: syscall exec -> 3
+3: syscall open -> 3
+3: syscall read -> 1023
+3: syscall read -> 965
+3: syscall read -> 453
+3: syscall read -> 0
+3: syscall close -> 0
+$ trace 65536 echo hi
+hi4: syscall write -> 2
+
+4: syscall write -> 1
+$ trace 2129920 grep hello README
+5: syscall open -> 3
+5: syscall close -> 0
+$ trace 0 echo untraced
+untraced
+$ trace
+usage: trace mask command [args...]
+$ trace 32 missingcommand
+trace: exec missingcommand failed
+$ QEMU: Terminated
