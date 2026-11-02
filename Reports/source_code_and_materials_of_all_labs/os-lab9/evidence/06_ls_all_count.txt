@@ -1,0 +1,39 @@
+$ strace -f -c ls -l
+total 32
+drwxrwxr-x 2 user user  4096 Nov  2 16:17 evidence
+-rw------- 1 user user  1742 Nov  2 16:17 experiment.sh
+-rw-r--r-- 1 user user    14 Nov  2 16:17 note.txt
+-rwxrwxr-x 1 user user 16272 Nov  2 16:17 syscalls
+-rw-rw-r-- 1 user user   663 Nov  2 16:17 syscalls.c
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 15.00    0.002673         243        11           read
+ 14.68    0.002617         163        16           close
+ 14.47    0.002580         151        17           mmap
+ 10.27    0.001831         183        10           openat
+  7.35    0.001310         262         5           statx
+  5.69    0.001015         338         3           newfstatat
+  5.22    0.000931          71        13           fstat
+  3.78    0.000674         674         1           execve
+  3.32    0.000592         592         1           getrandom
+  3.10    0.000553         110         5         5 lgetxattr
+  3.05    0.000544         136         4         4 connect
+  2.05    0.000365          73         5           mprotect
+  2.01    0.000359         119         3           brk
+  1.74    0.000311         311         1           arch_prctl
+  1.51    0.000269          53         5           listxattr
+  1.46    0.000260          65         4           socket
+  1.35    0.000240         120         2         2 statfs
+  0.74    0.000132         132         1           write
+  0.72    0.000129         129         1           munmap
+  0.51    0.000091          30         3           lseek
+  0.47    0.000084          42         2         2 access
+  0.39    0.000070          35         2           pread64
+  0.30    0.000054          54         1           rseq
+  0.30    0.000053          53         1           set_tid_address
+  0.29    0.000051          51         1         1 ioctl
+  0.12    0.000022          11         2           getdents64
+  0.06    0.000011          11         1           prlimit64
+  0.02    0.000003           3         1           set_robust_list
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.017824         146       122        14 total

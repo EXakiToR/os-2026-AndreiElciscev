@@ -1,0 +1,15 @@
+$ strace -f -c -e trace=openat,read,write,close ls -l
+total 32
+drwxrwxr-x 2 user user  4096 Nov  2 16:17 evidence
+-rw------- 1 user user  1742 Nov  2 16:17 experiment.sh
+-rw-r--r-- 1 user user    14 Nov  2 16:17 note.txt
+-rwxrwxr-x 1 user user 16272 Nov  2 16:17 syscalls
+-rw-rw-r-- 1 user user   663 Nov  2 16:17 syscalls.c
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 52.71    0.001564          97        16           close
+ 23.19    0.000688          62        11           read
+ 21.30    0.000632          63        10           openat
+  2.80    0.000083          83         1           write
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.002967          78        38           total

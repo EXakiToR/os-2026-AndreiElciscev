@@ -1,0 +1,9 @@
+$ strace -c -e trace=write ./syscalls
+open returned descriptor 3
+write sent 14 bytes
+read got 14 bytes: hello, kernel
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.000061          30         2           write
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.000061          30         2           total

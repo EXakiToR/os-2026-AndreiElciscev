@@ -1,0 +1,6 @@
+$ gcc -Wall -Wextra -o syscalls syscalls.c; ./syscalls; wc -c note.txt; cat note.txt
+open returned descriptor 3
+write sent 14 bytes
+read got 14 bytes: hello, kernel
+14 note.txt
+hello, kernel

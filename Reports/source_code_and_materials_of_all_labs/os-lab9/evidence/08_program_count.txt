@@ -1,0 +1,12 @@
+$ strace -c -e trace=openat,write,read,close ./syscalls
+open returned descriptor 3
+write sent 14 bytes
+read got 14 bytes: hello, kernel
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 60.28    0.000900         225         4           openat
+ 18.82    0.000281         140         2           write
+ 16.14    0.000241          60         4           close
+  4.76    0.000071          35         2           read
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.001493         124        12           total

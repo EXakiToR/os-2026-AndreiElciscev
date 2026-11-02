@@ -1,0 +1,3 @@
+$ test "$(wc -c < note.txt)" -eq 14 && printf "PASS: note.txt contains 14 bytes\n"; printf "hello, kernel\n" | cmp - note.txt && printf "PASS: file content matches the written message\n"
+PASS: note.txt contains 14 bytes
+PASS: file content matches the written message
