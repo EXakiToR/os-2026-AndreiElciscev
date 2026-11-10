@@ -1,0 +1,24 @@
+Lab 13 - Semaphores in Your Own Kernel
+Andrei Elciscev, FAF-243
+VM working tree: /home/user/os-lab13/xv6-riscv
+
+Part 3 Observe answers
+
+1. Why do letters mix without the lock?
+   Each letter is a separate write(1, p, 1) call. A line costs 31 write system calls: 30 letters and one newline. The two processes can execute their writes in between one another, so neither owns the console for the duration of a line.
+
+2. Which lines enclose the critical section?
+   sem_down(3); before the loop that writes the line, and sem_up(3); after it. Slot 3 starts at one, so a second process cannot start a line before the current owner returns the permit.
+
+3. Why does sem_down recheck with while?
+   sem_up wakes all processes registered on the slot. When one wakes, another process may acquire the lock first and consume the available permit. The woken process must recheck the value under the lock and wait again if it is zero.
+
+4. Why release the spinlock before sleep?
+   sem_up must acquire the same spinlock to add a permit and wake the waiter. Sleeping with it held blocks the only operation that can make progress, and xv6's scheduler also rejects sleeping with the extra spinlock held. Registering the wait channel before release prevents a lost semaphore wakeup if the post happens before the actual sleep.
+
+Check 1 showed unknown syscalls 24-26 and the child printed before the parent.
+Check 2 showed the parent first, three alternating ping-pong pairs, and semtest: OK.
+Both unlocked mix runs interleaved letters. mix lock printed ten intact lines.
+Lab 10 trace named all three new calls. See evidence.txt for the actual console output.
+
+The handout's API uses shared numbered slots and assumes that initialization is done before concurrent use. Its killed check runs after sleep returns. The baseline can miss a kill that arrives between wait registration and the transition to SLEEPING, because kkill only wakes processes that are already asleep. The lab tests exercise semaphore wakeups and do not cover that cancellation race.

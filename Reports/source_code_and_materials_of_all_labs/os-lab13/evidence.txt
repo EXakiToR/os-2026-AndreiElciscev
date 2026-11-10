@@ -1,0 +1,208 @@
+=== Environment and baseline ===
+Baseline source: /home/user/os-lab10/xv6-riscv
+$ uname -sr
+Linux 6.14.0-37-generic
+exit code: 0
+$ riscv64-linux-gnu-gcc --version
+riscv64-linux-gnu-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+Copyright (C) 2023 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+exit code: 0
+$ qemu-system-riscv64 --version
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+Copyright (c) 2003-2023 Fabrice Bellard and the QEMU Project developers
+exit code: 0
+$ make clean
+rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
+*/*.o */*.d */*.asm */*.sym \
+kernel/kernel fs.img \
+mkfs/mkfs .gdbinit \
+        user/usys.S \
+user/_cat user/_find user/_zombie user/_trace user/_run user/_pingpong user/_echo user/_sleep user/_args user/_mystat user/_forktest user/_grep user/_init user/_kill user/_ln user/_ls user/_mkdir user/_rm user/_sh user/_stressfs user/_usertests user/_grind user/_wc user/_zombie user/_logstress user/_forphan user/_dorphan user/_sync 
+exit code: 0
+$ make -j3 kernel/kernel fs.img
+Build output omitted.
+exit code: 0
+$ make qemu
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 3 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 1 starting
+hart 2 starting
+init: starting sh
+$ echo baseline boot OK
+baseline boot OK
+$ QEMU: Terminated
+=== Check 1: user stubs before kernel handlers ===
+$ make -j3 kernel/kernel fs.img
+Build output omitted.
+exit code: 0
+$ sed -n /^sem_init:/,$p user/usys.S
+sem_init:
+ li a7, SYS_sem_init
+ ecall
+ ret
+.global sem_down
+sem_down:
+ li a7, SYS_sem_down
+ ecall
+ ret
+.global sem_up
+sem_up:
+ li a7, SYS_sem_up
+ ecall
+ ret
+exit code: 0
+$ make qemu
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 3 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 2 starting
+hart 1 starting
+init: starting sh
+$ semtest
+3 semtest: unknown sys call 24
+4 semtest: unknown sys call 25
+child: I ran after the parent
+parent: done, I let the child go
+3 semtest: unknown sys call 26
+3 semtest: unknown sys call 24
+3 semtest: unknown sys call 24
+3 semtest: unknown sys call 25
+5 semtest: unknown sys call 25
+  pipong 1
+5 semtest: unknown sys call 26
+5n semtest: unknown sys call 25
+g 1
+3 semtest: unknown sys call 26
+3 semtest: unknown sys call 25
+ping 2
+3 semtest: unknown sys call 26
+3 semtest: unknown sys call 25
+  pong 2
+5 semtest: unknown sys call 26
+5 semtest: unknown sys call 25
+  pong ping 33
+3 semtest: unknown sys call 26
+
+5 semtest: unknown sys call 26
+semtest: OK
+$ QEMU: Terminated
+=== Check 2: kernel semaphores ===
+$ make -j3 kernel/kernel fs.img
+Build output omitted.
+exit code: 0
+$ make qemu
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 3 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 2 starting
+hart 1 starting
+init: starting sh
+$ semtest
+parent: done, I let the child go
+child: I ran after the parent
+ping 1
+  pong 1
+ping 2
+  pong 2
+ping 3
+  pong 3
+semtest: OK
+$ QEMU: Terminated
+=== Part 3: mix with and without a lock ===
+$ make qemu
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 3 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 1 starting
+hart 2 starting
+init: starting sh
+$ mix
+AAAAAAAAAAbAbAbbbbbbbbbbAAbAbAAAAAAAAbbAbAAAAAbAb
+AbAAAAbAAAAAAAbAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAbAbbbbbbb
+bbbbbbbbbbbbbbbbbbbAbAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+bbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+$ mix
+AAAAbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bAAAAAAAAAAAAAAAAbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbAAAAAbAbbbAAAAb
+bbbbbbbbAAAAAAAAAAAAAAAAAAAAAAAbAAAAAbbbAA
+AAAAAbbbbbbAAAAAAbbAAAAAAAAAAAAAAAAAAA
+AAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+$ mix lock
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+$ QEMU: Terminated
+=== Compatibility with Lab 10 trace ===
+$ make qemu
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 3 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 2 starting
+hart 1 starting
+init: starting sh
+$ trace 117440512 semtest
+3: syscall sem_init -> 0
+parent: done, I let the child go
+3: syscall sem_up -> 0
+4: syscall sem_down -> 0
+child: I ran after the parent
+3: syscall sem_init -> 0
+3: syscall sem_init -> 0
+3: syscall sem_down -> 0
+ping 1
+3: syscall sem_up -> 0
+5: syscall sem_down -> 0
+  pong 1
+5: syscall sem_up -> 0
+3: syscall sem_down -> 0
+ping 2
+3: syscall sem_up -> 0
+5: syscall sem_down -> 0
+  pong 2
+5: syscall sem_up -> 0
+3: syscall sem_down -> 0
+ping 3
+3: syscall sem_up -> 0
+5: syscall sem_down -> 0
+  pong 3
+5: syscall sem_up -> 0
+semtest: OK
+$ QEMU: Terminated
+=== Cleanup ===
+$ make clean
+rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
+*/*.o */*.d */*.asm */*.sym \
+kernel/kernel fs.img \
+mkfs/mkfs .gdbinit \
+        user/usys.S \
+user/_cat user/_find user/_zombie user/_semtest user/_mix user/_trace user/_run user/_pingpong user/_echo user/_sleep user/_args user/_mystat user/_forktest user/_grep user/_init user/_kill user/_ln user/_ls user/_mkdir user/_rm user/_sh user/_stressfs user/_usertests user/_grind user/_wc user/_zombie user/_logstress user/_forphan user/_dorphan user/_sync 
+exit code: 0
+$ tar -czf /home/user/os-lab13/.staging/xv6-riscv.tar.gz -C /home/user/os-lab13 xv6-riscv
+exit code: 0
