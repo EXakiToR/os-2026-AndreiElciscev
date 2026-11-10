@@ -1,0 +1,118 @@
+=== Environment ===
+$ pwd
+/home/user/os-lab11
+$ uname -sr
+Linux 6.14.0-37-generic
+$ nproc
+3
+$ gcc -dumpfullversion
+13.3.0
+=== Part 1: Race ===
+$ gcc -Wall -pthread -o race race.c
+$ ./race
+counter = 1675785 (expected 2000000)
+$ ./race
+counter = 1925845 (expected 2000000)
+$ ./race
+counter = 1205596 (expected 2000000)
+=== Part 2: Mutual exclusion ===
+$ gcc -Wall -pthread -o mutex mutex.c
+$ ./mutex
+counter = 2000000 (expected 2000000)
+$ ./mutex
+counter = 2000000 (expected 2000000)
+$ ./mutex
+counter = 2000000 (expected 2000000)
+$ gcc -Wall -pthread -o sem sem.c
+$ ./sem
+counter = 2000000 (expected 2000000)
+$ ./sem
+counter = 2000000 (expected 2000000)
+$ ./sem
+counter = 2000000 (expected 2000000)
+=== Part 2: Timings ===
+$ time ./race
+counter = 1832162 (expected 2000000)
+real 0.015 s | user 0.015 s | sys 0.002 s
+$ time ./mutex
+counter = 2000000 (expected 2000000)
+real 0.046 s | user 0.060 s | sys 0.017 s
+$ time ./sem
+counter = 2000000 (expected 2000000)
+real 0.074 s | user 0.087 s | sys 0.044 s
+$ time ./race
+counter = 1269920 (expected 2000000)
+real 0.010 s | user 0.014 s | sys 0.002 s
+$ time ./mutex
+counter = 2000000 (expected 2000000)
+real 0.058 s | user 0.055 s | sys 0.016 s
+$ time ./sem
+counter = 2000000 (expected 2000000)
+real 0.072 s | user 0.072 s | sys 0.018 s
+$ time ./race
+counter = 1269203 (expected 2000000)
+real 0.017 s | user 0.016 s | sys 0.006 s
+$ time ./mutex
+counter = 2000000 (expected 2000000)
+real 0.069 s | user 0.068 s | sys 0.015 s
+$ time ./sem
+counter = 2000000 (expected 2000000)
+real 0.072 s | user 0.081 s | sys 0.050 s
+=== Part 2: Semaphore initially 2 ===
+$ sed 's/sem_init(&s, 0, 1)/sem_init(\&s, 0, 2)/' sem.c > sem2.c
+$ grep -n sem_init sem2.c
+23:    sem_init(&s, 0, 2);         /* 0 = shared between threads, 1 = start value */
+$ gcc -Wall -pthread -o sem2 sem2.c
+$ ./sem2
+counter = 1999341 (expected 2000000)
+$ ./sem2
+counter = 1947310 (expected 2000000)
+$ ./sem2
+counter = 1994467 (expected 2000000)
+=== Part 3: Signal ===
+$ gcc -Wall -pthread -o order order.c
+$ ./order
+B: waiting for the message...
+A: message written
+B: I read "hello"
+$ sed 's/sem_init(&ready, 0, 0)/sem_init(\&ready, 0, 1)/' order.c > order1.c
+$ grep -n sem_init order1.c
+30:    sem_init(&ready, 0, 1);
+$ gcc -Wall -pthread -o order1 order1.c
+$ ./order1
+B: waiting for the message...
+B: I read ""
+A: message written
+=== Part 4: Parking ===
+$ gcc -Wall -pthread -o parking parking.c
+$ ./parking
+car 1 enters  (inside: 1)
+car 3 enters  (inside: 2)
+car 2 enters  (inside: 3)
+car 2 leaves  (inside: 2)
+car 3 leaves  (inside: 1)
+car 5 enters  (inside: 2)
+car 4 enters  (inside: 3)
+car 1 leaves  (inside: 2)
+car 6 enters  (inside: 3)
+car 4 leaves  (inside: 2)
+car 6 leaves  (inside: 1)
+car 5 leaves  (inside: 0)
+$ sed 's/^#define PLACES 3$/#define PLACES 1/' parking.c > parking1.c
+$ grep -n #define PLACES parking1.c
+9:#define PLACES 1
+$ gcc -Wall -pthread -o parking1 parking1.c
+$ ./parking1
+car 1 enters  (inside: 1)
+car 1 leaves  (inside: 0)
+car 2 enters  (inside: 1)
+car 2 leaves  (inside: 0)
+car 4 enters  (inside: 1)
+car 4 leaves  (inside: 0)
+car 5 enters  (inside: 1)
+car 5 leaves  (inside: 0)
+car 6 enters  (inside: 1)
+car 6 leaves  (inside: 0)
+car 3 enters  (inside: 1)
+car 3 leaves  (inside: 0)
+=== End ===
