@@ -1,0 +1,174 @@
+=== Environment ===
+$ uname -sr
+Linux 6.14.0-37-generic
+$ gcc -dumpfullversion
+13.3.0
+=== Producer and consumer ===
+$ gcc -Wall -pthread -o prodcons prodcons.c
+$ ./prodcons
+put  1   (in buffer: 1)
+put  2   (in buffer: 2)
+put  3   (in buffer: 3)
+put  4   (in buffer: 4)
+            take 1   (in buffer: 3)
+put  5   (in buffer: 4)
+            take 2   (in buffer: 3)
+put  6   (in buffer: 4)
+            take 3   (in buffer: 3)
+put  7   (in buffer: 4)
+            take 4   (in buffer: 3)
+put  8   (in buffer: 4)
+            take 5   (in buffer: 3)
+            take 6   (in buffer: 2)
+            take 7   (in buffer: 1)
+            take 8   (in buffer: 0)
+=== Producer locks before waiting ===
+$ sed -n 20,25p prodcons_bad.c
+        pthread_mutex_lock(&lock);
+        sem_wait(&empty);
+        buf[in] = item;
+        in = (in + 1) % SIZE;
+        count++;
+        printf("put  %d   (in buffer: %d)\n", item, count);
+$ gcc -Wall -pthread -o prodcons_bad prodcons_bad.c
+$ timeout 5 stdbuf -oL ./prodcons_bad; echo "exit code: $?";
+put  1   (in buffer: 1)
+put  2   (in buffer: 2)
+put  3   (in buffer: 3)
+put  4   (in buffer: 4)
+exit code: 124
+=== Condition variable ===
+$ gcc -Wall -pthread -o condvar condvar.c
+$ ./condvar
+B: not ready, I sleep
+A: message written
+B: I read "hello"
+=== Condition variable with if ===
+$ sed "s/while (!ready)/if (!ready)/" condvar.c > condvar_if.c
+$ gcc -Wall -pthread -o condvar_if condvar_if.c
+$ ./condvar_if
+B: not ready, I sleep
+A: message written
+B: I read "hello"
+=== Readers and writers ===
+$ gcc -Wall -pthread -o readers readers.c
+$ ./readers
+writer 1 writes 10  (alone)
+reader 1 reads 10   (readers at entry: 1)
+reader 2 reads 10   (readers at entry: 2)
+reader 3 reads 10   (readers at entry: 3)
+writer 2 writes 20  (alone)
+=== Opposite lock order ===
+$ gcc -Wall -pthread -o deadlock deadlock.c
+$ timeout 5 stdbuf -oL ./deadlock; echo "exit code: $?";
+two: I have B, I want A
+one: I have A, I want B
+exit code: 124
+=== Opposite order without sleeps ===
+$ sed "/^[[:space:]]*sleep(1);/d" deadlock.c > deadlock_fast.c
+$ gcc -Wall -pthread -o deadlock_fast deadlock_fast.c
+Trial 1
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+one: I have A, I want B
+one: I have both
+two: I have B, I want A
+two: I have both
+done
+exit code: 0
+Trial 2
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+two: I have B, I want A
+one: I have A, I want B
+exit code: 124
+Trial 3
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+two: I have B, I want A
+one: I have A, I want B
+exit code: 124
+Trial 4
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+two: I have B, I want A
+two: I have both
+one: I have A, I want B
+one: I have both
+done
+exit code: 0
+Trial 5
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+two: I have B, I want A
+two: I have both
+one: I have A, I want B
+one: I have both
+done
+exit code: 0
+Trial 6
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+two: I have B, I want A
+two: I have both
+one: I have A, I want B
+one: I have both
+done
+exit code: 0
+Trial 7
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+one: I have A, I want B
+one: I have both
+two: I have B, I want A
+two: I have both
+done
+exit code: 0
+Trial 8
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+one: I have A, I want B
+one: I have both
+two: I have B, I want A
+two: I have both
+done
+exit code: 0
+Trial 9
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+two: I have B, I want A
+one: I have A, I want B
+exit code: 124
+Trial 10
+$ timeout 5 stdbuf -oL ./deadlock_fast; echo "exit code: $?"
+two: I have B, I want A
+two: I have both
+one: I have A, I want B
+one: I have both
+done
+exit code: 0
+=== Consistent lock order ===
+$ sed -n 13,35p deadlock.c
+    pthread_mutex_lock(&A);
+    printf("one: I have A, I want B\n");
+    sleep(1);
+    pthread_mutex_lock(&B);
+    printf("one: I have both\n");
+    pthread_mutex_unlock(&B);
+    pthread_mutex_unlock(&A);
+    return NULL;
+}
+
+void *two(void *arg) {
+    pthread_mutex_lock(&A);
+    printf("two: I have A, I want B\n");
+    sleep(1);
+    pthread_mutex_lock(&B);
+    printf("two: I have both\n");
+    pthread_mutex_unlock(&B);
+    pthread_mutex_unlock(&A);
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+$ gcc -Wall -pthread -o deadlock deadlock.c
+$ timeout 5 stdbuf -oL ./deadlock; echo "exit code: $?";
+one: I have A, I want B
+one: I have both
+two: I have A, I want B
+two: I have both
+done
+exit code: 0
+=== End ===
