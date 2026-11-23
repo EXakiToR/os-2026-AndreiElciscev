@@ -1,0 +1,47 @@
+Lab 18 - Build a User-Level Thread Switch
+Andrei Elciscev, FAF-243
+
+VM tree: /home/user/os-lab18/xv6-riscv
+Baseline: /home/user/os-lab13/xv6-riscv
+
+Observe - What exactly is saved and loaded? Why does ra resume the other thread?
+
+thread_switch(old, new) stores 14 64-bit registers in the old thread's context:
+ra, sp, and s0 through s11. It loads those 14 registers from the new context.
+The saved context occupies 112 bytes. Its offsets are 0 for ra, 8 for sp, and
+16 through 104 for s0 through s11. Loading sp selects the other thread's stack.
+
+The call to thread_switch leaves a return address in ra. When the thread is
+switched away, that return address is saved in its context. A later switch
+restores it, and ret jumps to that address, continuing just after that thread's
+earlier call to thread_switch. For a new thread, thread_create initially puts
+the worker function's address in ctx.ra and the 16-byte-aligned top of its
+8192-byte stack in ctx.sp, so its first ret enters the worker function.
+
+The s registers are callee-saved by the RISC-V calling convention. The compiler
+handles caller-saved registers across the ordinary function call boundary.
+The switch also retains the return address and stack pointer needed to resume.
+All user threads run cooperatively in one xv6 process and share its address space.
+They have separate stacks and saved contexts. Switching is a user-space call,
+with no additional kernel thread creation.
+
+Implementation
+- Context has ra, sp, s0..s11 in the assembly order.
+- thread_create initializes ra/sp and marks a slot runnable.
+- thread_schedule selects the next runnable slot, updates state/current_thread,
+  and calls thread_switch with the old and new context addresses.
+- thread_b and thread_c mirror thread_a with their own flags and counters.
+- The Makefile includes _uthread and links uthread_switch.o explicitly.
+- A boundary check rejects creation if the four-slot table is full.
+
+Verification
+- The handout's os2026-setup.sh was absent under /home/user. The installed RISC-V
+  compiler and QEMU were checked, then the baseline and final tree built and booted.
+- Each worker printed 0 through 99, in c/a/b order for all 300 counter lines.
+- Each exited after 100 increments.
+- The final 'thread_schedule: no runnable threads' message follows the supplied
+  skeleton, which calls exit(-1) after all workers mark themselves FREE.
+- The shell accepted a command afterward.
+- Kernel source files matched the Lab 13 baseline byte for byte.
+
+Full build output, disassembly, QEMU output, and validation results are in evidence.txt.

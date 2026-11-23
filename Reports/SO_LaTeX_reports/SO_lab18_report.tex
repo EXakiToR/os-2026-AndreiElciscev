@@ -1,0 +1,451 @@
+% Self-contained report. Compile with pdfLaTeX in Overleaf (twice for contents).
+\documentclass[12pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\definecolor{listinggray}{RGB}{247,247,247}
+\lstset{basicstyle=\ttfamily\footnotesize,backgroundcolor=\color{listinggray},
+ frame=single,rulecolor=\color{gray},breaklines=true,breakatwhitespace=false,
+ columns=fullflexible,keepspaces=true,showstringspaces=false,tabsize=4,
+ captionpos=b,aboveskip=10pt,belowskip=10pt}
+\setlength{\emergencystretch}{3em}
+\begin{document}
+\begin{titlepage}
+\centering
+\textbf{Ministry of Education, Culture and Research of the Republic of Moldova}\par\medskip
+\textbf{Technical University of Moldova}\par\medskip
+\textbf{Faculty of Computers, Informatics and Microelectronics}\par\medskip
+\textbf{Department of Software Engineering and Automatic}\par
+\vspace{2.5cm}
+\textbf{ANDREI ELCISCEV}\par
+\textbf{Group FAF-243}\par
+\vspace{2cm}
+{\Large\textbf{LABORATORY WORK No. 18}\par}
+\medskip
+{\Large\textbf{BUILD A USER-LEVEL THREAD SWITCH}\par}
+\vspace{2cm}
+\begin{flushright}
+\textbf{Checked by:}\\
+Rei\c{t}man Patricia
+\end{flushright}
+\vfill
+\textbf{Chi\c{s}in\u{a}u, 2026}
+\end{titlepage}
+\pagenumbering{arabic}
+\tableofcontents
+\newpage
+\section{Introduction}
+This laboratory work implements cooperative user-level threads in xv6. Each
+thread has its own stack and a saved register context. A user-space scheduler
+switches between runnable threads by calling an assembly routine that saves one
+context and restores another.
+
+The working tree is \texttt{/home/user/os-lab18/xv6-riscv}, copied from the
+completed Lab 13 tree. The handout's \texttt{os2026-setup.sh} was absent under
+\texttt{/home/user}. The installed RISC-V compiler and QEMU were checked directly,
+and the baseline built and booted before the Lab 18 edits.
+
+\section{Environment and Baseline}
+
+\begin{lstlisting}[caption={Baseline and installed toolchain}]
+Baseline source: /home/user/os-lab13/xv6-riscv
+os2026-setup.sh was not found under /home/user. Direct build and boot checks follow.
+$ uname -sr
+Linux 6.14.0-37-generic
+exit code: 0
+$ riscv64-linux-gnu-gcc --version
+riscv64-linux-gnu-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+Copyright (C) 2023 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+exit code: 0
+$ qemu-system-riscv64 --version
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+Copyright (c) 2003-2023 Fabrice Bellard and the QEMU Project developers
+exit code: 0
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Baseline QEMU boot and shell check}]
+xv6 kernel is booting
+
+hart 1 starting
+hart 2 starting
+init: starting sh
+$ echo baseline boot OK
+baseline boot OK
+$ QEMU: Terminated
+\end{lstlisting}
+
+\section{Part 1: Implement the Switch}
+\subsection{The Saved Context}
+The context consists of 14 fields of type \texttt{uint64}. The order matches the
+offsets used in the assembly routine. The return address occupies offset 0 and
+the stack pointer offset 8. The twelve saved registers \texttt{s0} through
+\texttt{s11} occupy offsets 16 through 104. The complete context is 112 bytes.
+Each thread has an 8192-byte stack aligned to 16 bytes.
+
+\subsection{Thread Creation}
+\texttt{thread\_create} selects a free slot, marks it runnable, puts the function
+address in \texttt{ctx.ra}, and sets \texttt{ctx.sp} to the top of the stack.
+A small boundary check reports an error if all four slots are occupied.
+
+\subsection{Scheduling and Switching}
+The scheduler scans the four slots in round-robin order. When it finds a different
+runnable thread, it remembers the current thread, marks the selected thread
+running, updates \texttt{current\_thread}, and switches the saved contexts.
+Yielding marks the current thread runnable before entering the scheduler.
+
+The main thread uses slot 0, then marks itself free after creating the three
+workers. Workers A, B, and C each wait until the other two have started, increment
+their own counter 100 times with a yield after each iteration, then mark their
+slot free and schedule again.
+
+\subsection{Makefile Changes}
+The program is added to \texttt{UPROGS}, and the explicit link rule includes both
+its C object and its assembly switch object.
+
+\begin{lstlisting}[caption={New UPROGS entry and explicit link rule}]
+	$U/_uthread\
+
+$U/_uthread: $U/uthread.o $U/uthread_switch.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $U/_uthread $U/uthread.o $U/uthread_switch.o $(ULIB)
+	$(OBJDUMP) -S $U/_uthread > $U/uthread.asm
+\end{lstlisting}
+
+\subsection{Assembly Inspection}
+The finished tree built successfully. The following actual object disassembly
+shows the save/load pairs generated from \texttt{user/uthread\_switch.S}.
+
+\begin{lstlisting}[caption={Disassembly of the context-switch routine}]
+$ riscv64-linux-gnu-objdump -d user/uthread_switch.o
+
+user/uthread_switch.o:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000000000000 <thread_switch>:
+   0:	00153023          	sd	ra,0(a0)
+   4:	00253423          	sd	sp,8(a0)
+   8:	e900                	sd	s0,16(a0)
+   a:	ed04                	sd	s1,24(a0)
+   c:	03253023          	sd	s2,32(a0)
+  10:	03353423          	sd	s3,40(a0)
+  14:	03453823          	sd	s4,48(a0)
+  18:	03553c23          	sd	s5,56(a0)
+  1c:	05653023          	sd	s6,64(a0)
+  20:	05753423          	sd	s7,72(a0)
+  24:	05853823          	sd	s8,80(a0)
+  28:	05953c23          	sd	s9,88(a0)
+  2c:	07a53023          	sd	s10,96(a0)
+  30:	07b53423          	sd	s11,104(a0)
+  34:	0005b083          	ld	ra,0(a1)
+  38:	0085b103          	ld	sp,8(a1)
+  3c:	6980                	ld	s0,16(a1)
+  3e:	6d84                	ld	s1,24(a1)
+  40:	0205b903          	ld	s2,32(a1)
+  44:	0285b983          	ld	s3,40(a1)
+  48:	0305ba03          	ld	s4,48(a1)
+  4c:	0385ba83          	ld	s5,56(a1)
+  50:	0405bb03          	ld	s6,64(a1)
+  54:	0485bb83          	ld	s7,72(a1)
+  58:	0505bc03          	ld	s8,80(a1)
+  5c:	0585bc83          	ld	s9,88(a1)
+  60:	0605bd03          	ld	s10,96(a1)
+  64:	0685bd83          	ld	s11,104(a1)
+  68:	8082                	ret
+exit code: 0
+\end{lstlisting}
+
+\section{Part 2: Run and Verify}
+The complete output was checked against the expected sequence. After the three
+start messages, the workers printed in the order C, A, B for every value from 0
+through 99. Each worker exited after 100 increments. The transcript below is an
+excerpt with 285 intermediate counter lines omitted. The full output is retained
+in \texttt{evidence.txt}.
+
+\begin{lstlisting}[caption={Actual xv6 run with the middle counter lines omitted}]
+$ uthread
+thread_a started
+thread_b started
+thread_c started
+thread_c 0
+thread_a 0
+thread_b 0
+thread_c 1
+thread_a 1
+thread_b 1
+thread_c 2
+thread_a 2
+thread_b 2
+[285 intermediate counter lines omitted]
+thread_c 98
+thread_a 98
+thread_b 98
+thread_c 99
+thread_a 99
+thread_b 99
+thread_c: exit after 100
+thread_a: exit after 100
+thread_b: exit after 100
+thread_schedule: no runnable threads
+$ echo shell still runs
+shell still runs
+\end{lstlisting}
+
+The final message follows the supplied skeleton. Once every worker has marked
+itself free, there is no runnable slot, so the scheduler prints the message and
+calls \texttt{exit(-1)}. The xv6 shell then accepts another command.
+
+\begin{lstlisting}[caption={Checks on the full output, register layout, and source files}]
+PASS: each worker printed 0 through 99 and exited after 100.
+PASS: all 300 counter lines followed the c, a, b round-robin order.
+PASS: all 14 register offsets match between C context and assembly.
+PASS: kernel source files match the Lab 13 baseline byte for byte.
+PASS: the xv6 shell accepted a command after uthread finished.
+\end{lstlisting}
+
+\section{Observe: Saved Registers and the Return Address}
+\texttt{thread\_switch(old, new)} stores \texttt{ra}, \texttt{sp}, and
+\texttt{s0} through \texttt{s11} in the old context, then loads those registers
+from the new context. The stack pointer selects the other thread's stack.
+
+A call to \texttt{thread\_switch} leaves a return address in \texttt{ra}. Saving
+that register records where the suspended thread should resume. Restoring
+another thread's \texttt{ra} and executing \texttt{ret} transfers control to its
+saved continuation, just after its earlier switch call. A new thread has its
+function address placed in \texttt{ra}, so the first return enters that function.
+
+The \texttt{s} registers are callee-saved under the RISC-V calling convention.
+The compiler handles caller-saved registers around the ordinary function call
+boundary. The switch also preserves the return address and stack pointer needed
+for the continuation. All three threads share the address space of one xv6
+process and cooperate by yielding.
+
+\section{Conclusion}
+The context-switch routine saved and restored the register state required to
+resume each worker on its own stack. The full output verified all 300 counter
+lines and the three final values of 100. The implementation changes are in the
+user program, its assembly routine, and the Makefile.
+
+\appendix
+\section{Source Code}
+
+\begin{lstlisting}[caption={user/uthread.c},language=C]
+#include "kernel/types.h"
+#include "user/user.h"
+
+#define FREE     0x0
+#define RUNNING  0x1
+#define RUNNABLE 0x2
+
+#define STACK_SIZE 8192
+#define MAX_THREAD 4
+
+/* Layout matches the offsets used by uthread_switch.S. */
+struct context {
+  uint64 ra;
+  uint64 sp;
+  uint64 s0;
+  uint64 s1;
+  uint64 s2;
+  uint64 s3;
+  uint64 s4;
+  uint64 s5;
+  uint64 s6;
+  uint64 s7;
+  uint64 s8;
+  uint64 s9;
+  uint64 s10;
+  uint64 s11;
+};
+
+struct thread {
+  struct context ctx;
+  char stack[STACK_SIZE] __attribute__((aligned(16)));
+  int state;
+};
+
+struct thread all_thread[MAX_THREAD];
+struct thread *current_thread;
+
+extern void thread_switch(struct context *old, struct context *new);
+
+void
+thread_init(void)
+{
+  current_thread = &all_thread[0];
+  current_thread->state = RUNNING;
+}
+
+void
+thread_schedule(void)
+{
+  struct thread *t, *next_thread;
+
+  next_thread = 0;
+  t = current_thread + 1;
+  for (int i = 0; i < MAX_THREAD; i++) {
+    if (t >= all_thread + MAX_THREAD)
+      t = all_thread;
+    if (t->state == RUNNABLE) {
+      next_thread = t;
+      break;
+    }
+    t = t + 1;
+  }
+
+  if (next_thread == 0) {
+    printf("thread_schedule: no runnable threads\n");
+    exit(-1);
+  }
+
+  if (current_thread != next_thread) {
+    struct thread *old = current_thread;
+    next_thread->state = RUNNING;
+    current_thread = next_thread;
+    thread_switch(&old->ctx, &next_thread->ctx);
+  }
+}
+
+void
+thread_create(void (*func)(void))
+{
+  struct thread *t;
+
+  for (t = all_thread; t < all_thread + MAX_THREAD; t++) {
+    if (t->state == FREE)
+      break;
+  }
+  if (t == all_thread + MAX_THREAD) {
+    fprintf(2, "thread_create: no free thread slots\n");
+    exit(1);
+  }
+  t->state = RUNNABLE;
+  t->ctx.ra = (uint64)func;
+  t->ctx.sp = (uint64)(t->stack + STACK_SIZE);
+}
+
+void
+thread_yield(void)
+{
+  current_thread->state = RUNNABLE;
+  thread_schedule();
+}
+
+volatile int a_started, b_started, c_started;
+volatile int a_n, b_n, c_n;
+
+void
+thread_a(void)
+{
+  printf("thread_a started\n");
+  a_started = 1;
+  while (b_started == 0 || c_started == 0)
+    thread_yield();
+
+  for (int i = 0; i < 100; i++) {
+    printf("thread_a %d\n", i);
+    a_n += 1;
+    thread_yield();
+  }
+  printf("thread_a: exit after %d\n", a_n);
+  current_thread->state = FREE;
+  thread_schedule();
+}
+
+void
+thread_b(void)
+{
+  printf("thread_b started\n");
+  b_started = 1;
+  while (a_started == 0 || c_started == 0)
+    thread_yield();
+
+  for (int i = 0; i < 100; i++) {
+    printf("thread_b %d\n", i);
+    b_n += 1;
+    thread_yield();
+  }
+  printf("thread_b: exit after %d\n", b_n);
+  current_thread->state = FREE;
+  thread_schedule();
+}
+
+void
+thread_c(void)
+{
+  printf("thread_c started\n");
+  c_started = 1;
+  while (a_started == 0 || b_started == 0)
+    thread_yield();
+
+  for (int i = 0; i < 100; i++) {
+    printf("thread_c %d\n", i);
+    c_n += 1;
+    thread_yield();
+  }
+  printf("thread_c: exit after %d\n", c_n);
+  current_thread->state = FREE;
+  thread_schedule();
+}
+
+int
+main(void)
+{
+  a_started = b_started = c_started = 0;
+  a_n = b_n = c_n = 0;
+  thread_init();
+  thread_create(thread_a);
+  thread_create(thread_b);
+  thread_create(thread_c);
+  current_thread->state = FREE;
+  thread_schedule();
+  exit(0);
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={user/uthread\_switch.S}]
+.text
+.globl thread_switch
+thread_switch:
+  sd ra,   0(a0)
+  sd sp,   8(a0)
+  sd s0,  16(a0)
+  sd s1,  24(a0)
+  sd s2,  32(a0)
+  sd s3,  40(a0)
+  sd s4,  48(a0)
+  sd s5,  56(a0)
+  sd s6,  64(a0)
+  sd s7,  72(a0)
+  sd s8,  80(a0)
+  sd s9,  88(a0)
+  sd s10, 96(a0)
+  sd s11,104(a0)
+
+  ld ra,   0(a1)
+  ld sp,   8(a1)
+  ld s0,  16(a1)
+  ld s1,  24(a1)
+  ld s2,  32(a1)
+  ld s3,  40(a1)
+  ld s4,  48(a1)
+  ld s5,  56(a1)
+  ld s6,  64(a1)
+  ld s7,  72(a1)
+  ld s8,  80(a1)
+  ld s9,  88(a1)
+  ld s10, 96(a1)
+  ld s11,104(a1)
+  ret
+\end{lstlisting}
+
+\end{document}
