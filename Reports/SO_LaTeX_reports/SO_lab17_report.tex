@@ -1,0 +1,237 @@
+% Self-contained report. Compile with pdfLaTeX in Overleaf (twice for contents).
+\documentclass[12pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\definecolor{listinggray}{RGB}{247,247,247}
+\lstset{basicstyle=\ttfamily\footnotesize,backgroundcolor=\color{listinggray},
+ frame=single,rulecolor=\color{gray},breaklines=true,breakatwhitespace=false,
+ columns=fullflexible,keepspaces=true,showstringspaces=false,tabsize=4,
+ captionpos=b,aboveskip=10pt,belowskip=10pt}
+\setlength{\emergencystretch}{3em}
+\begin{document}
+\begin{titlepage}
+\centering
+\textbf{Ministry of Education, Culture and Research of the Republic of Moldova}\par\medskip
+\textbf{Technical University of Moldova}\par\medskip
+\textbf{Faculty of Computers, Informatics and Microelectronics}\par\medskip
+\textbf{Department of Software Engineering and Automatic}\par
+\vspace{2.5cm}
+\textbf{ANDREI ELCISCEV}\par
+\textbf{Group FAF-243}\par
+\vspace{2cm}
+{\Large\textbf{LABORATORY WORK No. 17}\par}
+\medskip
+{\Large\textbf{THREADS SHARE MEMORY, AND RACE}\par}
+\vspace{2cm}
+\begin{flushright}
+\textbf{Checked by:}\\
+Rei\c{t}man Patricia
+\end{flushright}
+\vfill
+\textbf{Chi\c{s}in\u{a}u, 2026}
+\end{titlepage}
+\pagenumbering{arabic}
+\tableofcontents
+\newpage
+\section{Introduction}
+This laboratory work examines how POSIX threads share a process's memory and how
+unsynchronized updates can be lost. Each worker increments one global counter a
+million times. The experiment first uses two workers, then increases their number
+to four.
+
+The work ran in \texttt{/home/user/os-lab17} in the Linux VM. The compiler used
+\texttt{-Wall -Wextra -pthread} at its default optimization level. The listings
+contain actual commands and output. The original two-thread version is retained
+as \texttt{fire\_two.c}, and \texttt{fire.c} contains the four-thread extension.
+
+\begin{lstlisting}[caption={Working directory, kernel, available CPUs, and compiler}]
+$ pwd
+/home/user/os-lab17
+$ uname -sr
+Linux 6.14.0-37-generic
+$ nproc
+3
+$ gcc -dumpfullversion
+13.3.0
+\end{lstlisting}
+
+\section{Part 1: Shared and Racing}
+The main thread creates two workers and joins both before printing the final
+counter. Joining waits for completion, while the workers access the counter
+without synchronization.
+
+\begin{lstlisting}[caption={Three actual trials with two workers}]
+$ gcc -Wall -Wextra -pthread -o fire_two fire_two.c
+$ ./fire_two
+thread 2 sees counter = 0
+thread 1 sees counter = 0
+expected: 2000000
+counter:  1207310   (lost updates: the race)
+$ ./fire_two
+thread 1 sees counter = 0
+thread 2 sees counter = 0
+expected: 2000000
+counter:  1321397   (lost updates: the race)
+$ ./fire_two
+thread 1 sees counter = 0
+thread 2 sees counter = 195948
+expected: 2000000
+counter:  1821131   (lost updates: the race)
+\end{lstlisting}
+
+\subsection{Observe: The Same Variable}
+In the third trial, thread 2 printed a starting value of 195948. Thread 1 had
+already started incrementing the same global counter. Both threads operate in
+one address space. In the other two trials, both initial reads were zero because
+the relative timing differed.
+
+\subsection{Observe: Lost Increments}
+An increment reads the value, adds one, and stores the result. If both threads
+read 10 before either stores, both can compute 11 and store 11. Two attempted
+increments then produce a net increase of one. Scheduling and parallel execution
+change how these operations interleave.
+
+The conflicting unsynchronized accesses constitute a C data race with undefined
+behavior. The measured outcomes illustrate lost updates. A specific count, a
+different count in every run, or a count below the expected total in every
+execution is not guaranteed by the language.
+
+\section{Part 2: Four Workers}
+Two additional workers use IDs 3 and 4. The main thread joins all four and compares
+the result with \(4\times1{,}000{,}000=4{,}000{,}000\).
+
+\begin{lstlisting}[caption={Three actual trials with four workers}]
+$ gcc -Wall -Wextra -pthread -o fire fire.c
+$ ./fire
+thread 1 sees counter = 0
+thread 2 sees counter = 87834
+thread 3 sees counter = 1010351
+thread 4 sees counter = 1131088
+expected: 4000000
+counter:  2417179   (lost updates: the race)
+$ ./fire
+thread 1 sees counter = 0
+thread 2 sees counter = 67579
+thread 3 sees counter = 283743
+thread 4 sees counter = 337420
+expected: 4000000
+counter:  2087047   (lost updates: the race)
+$ ./fire
+thread 2 sees counter = 0
+thread 1 sees counter = 0
+thread 3 sees counter = 48173
+thread 4 sees counter = 235861
+expected: 4000000
+counter:  1629452   (lost updates: the race)
+\end{lstlisting}
+
+\subsection{Comparing Lost Updates}
+Each loss count below is the expected total minus the observed total. Each row
+describes a separate execution.
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+Workers & Trial & Expected & Observed & Lost updates\\
+\midrule
+2 & 1 & 2000000 & 1207310 & 792690\\
+2 & 2 & 2000000 & 1321397 & 678603\\
+2 & 3 & 2000000 & 1821131 & 178869\\
+4 & 1 & 4000000 & 2417179 & 1582821\\
+4 & 2 & 4000000 & 2087047 & 1912953\\
+4 & 3 & 4000000 & 1629452 & 2370548\\
+\bottomrule
+\end{tabular}
+\end{center}
+The mean absolute loss rose from 550054 to 1955441 updates. The mean lost fraction rose from 27.50\% to 48.89\%.
+
+The VM exposes three CPUs. The extra workers increased loss in these measurements.
+The number lost depends on timing, so individual executions can differ.
+
+\subsection{Observe: One Idea for a Safe Increment}
+Protect the entire read--add--write operation with one shared mutex so only one
+worker can increment the counter at a time. The handout asks for a proposal,
+so the experimental programs retain the unprotected increment.
+
+\section{Conclusion}
+The initial counter reads and the final counts demonstrated shared memory and
+lost updates in the recorded runs. Increasing from two to four workers increased
+both the mean number and mean fraction of lost updates in this VM. Mutual
+exclusion around the complete increment would serialize that critical section.
+
+\appendix
+\section{Submitted Source Code}
+
+\begin{lstlisting}[caption={fire\_two.c},language=C]
+/* fire.c - two threads of one process share the same memory.
+ * Both add to the same counter, a million times each, WITHOUT a lock.
+ * Build: gcc -Wall -Wextra -pthread -o fire fire.c   Run: ./fire
+ */
+#include <stdio.h>
+#include <pthread.h>
+
+#define N 1000000
+long counter = 0;              /* one variable, shared by both threads */
+
+void *work(void *arg) {
+    long id = (long)arg;
+    printf("thread %ld sees counter = %ld\n", id, counter);
+    for (int i = 0; i < N; i++)
+        counter++;             /* NOT atomic: read, add, write */
+    return NULL;
+}
+
+int main(void) {
+    pthread_t a, b;
+    pthread_create(&a, NULL, work, (void *)1);
+    pthread_create(&b, NULL, work, (void *)2);
+    pthread_join(a, NULL);
+    pthread_join(b, NULL);
+    printf("expected: %d\n", 2 * N);
+    printf("counter:  %ld   (lost updates: the race)\n", counter);
+    return 0;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={fire.c},language=C]
+/* fire.c - four threads of one process share the same memory.
+ * All add to the same counter, a million times each, WITHOUT a lock.
+ * Build: gcc -Wall -Wextra -pthread -o fire fire.c   Run: ./fire
+ */
+#include <stdio.h>
+#include <pthread.h>
+
+#define N 1000000
+long counter = 0;              /* one variable, shared by all four threads */
+
+void *work(void *arg) {
+    long id = (long)arg;
+    printf("thread %ld sees counter = %ld\n", id, counter);
+    for (int i = 0; i < N; i++)
+        counter++;             /* NOT atomic: read, add, write */
+    return NULL;
+}
+
+int main(void) {
+    pthread_t a, b, c, d;
+    pthread_create(&a, NULL, work, (void *)1);
+    pthread_create(&b, NULL, work, (void *)2);
+    pthread_create(&c, NULL, work, (void *)3);
+    pthread_create(&d, NULL, work, (void *)4);
+    pthread_join(a, NULL);
+    pthread_join(b, NULL);
+    pthread_join(c, NULL);
+    pthread_join(d, NULL);
+    printf("expected: %d\n", 4 * N);
+    printf("counter:  %ld   (lost updates: the race)\n", counter);
+    return 0;
+}
+\end{lstlisting}
+
+\end{document}

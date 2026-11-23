@@ -1,0 +1,50 @@
+=== Environment ===
+$ pwd
+/home/user/os-lab17
+$ uname -sr
+Linux 6.14.0-37-generic
+$ nproc
+3
+$ gcc -dumpfullversion
+13.3.0
+=== Part 1: Two threads ===
+$ gcc -Wall -Wextra -pthread -o fire_two fire_two.c
+$ ./fire_two
+thread 2 sees counter = 0
+thread 1 sees counter = 0
+expected: 2000000
+counter:  1207310   (lost updates: the race)
+$ ./fire_two
+thread 1 sees counter = 0
+thread 2 sees counter = 0
+expected: 2000000
+counter:  1321397   (lost updates: the race)
+$ ./fire_two
+thread 1 sees counter = 0
+thread 2 sees counter = 195948
+expected: 2000000
+counter:  1821131   (lost updates: the race)
+=== Part 2: Four threads ===
+$ gcc -Wall -Wextra -pthread -o fire fire.c
+$ ./fire
+thread 1 sees counter = 0
+thread 2 sees counter = 87834
+thread 3 sees counter = 1010351
+thread 4 sees counter = 1131088
+expected: 4000000
+counter:  2417179   (lost updates: the race)
+$ ./fire
+thread 1 sees counter = 0
+thread 2 sees counter = 67579
+thread 3 sees counter = 283743
+thread 4 sees counter = 337420
+expected: 4000000
+counter:  2087047   (lost updates: the race)
+$ ./fire
+thread 2 sees counter = 0
+thread 1 sees counter = 0
+thread 3 sees counter = 48173
+thread 4 sees counter = 235861
+expected: 4000000
+counter:  1629452   (lost updates: the race)
+=== End ===
